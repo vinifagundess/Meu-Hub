@@ -36,15 +36,18 @@
 
   <section class="view" id="fin">
     <h1>Financeiro</h1>
-    <div class="card"><p class="muted">Saldo atual</p><p class="big" id="f-balance">R$ 0,00</p>
-      <div class="split"><span>Entradas <b class="pos" id="f-in"></b></span><span>Saídas <b class="neg" id="f-out"></b></span></div></div>
+    <div class="card hero"><p class="muted">Saldo atual</p><p class="big" id="f-balance">R$ 0,00</p>
+      <p class="muted small">Saldo inicial <b id="f-initial">R$ 0,00</b> + entradas − saídas</p>
+      <div class="split"><span>Entradas <b class="pos" id="f-in"></b></span><span>Saídas <b class="neg" id="f-out"></b></span></div>
+      <button type="button" class="btn ghost sm mt" id="f-adjust">Ajustar saldo</button></div>
     <form id="tx-form" class="card stack">
       <div class="seg"><label><input type="radio" name="type" value="in" checked><span>Entrada</span></label><label><input type="radio" name="type" value="out"><span>Saída</span></label></div>
-      <input name="desc" placeholder="Descrição (ex: Almoço, Uber)" required maxlength="60">
+      <input name="desc" placeholder="Descrição (ex: Salário, Almoço, Uber)" required maxlength="60">
       <input name="amount" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Valor (R$)" required>
-      <button class="btn">Adicionar</button>
+      <button class="btn" id="tx-btn">Adicionar entrada</button>
     </form>
-    <ul class="list" id="tx-list"></ul>
+    <h2>Histórico</h2>
+    <ul class="list card" id="tx-list"></ul>
   </section>
 
   <section class="view" id="notes">
@@ -77,6 +80,7 @@
   <div class="split"><button type="button" class="btn ghost danger" id="note-del">Excluir</button><button type="button" class="btn ghost" id="note-cancel">Cancelar</button><button class="btn" value="save">Salvar</button></div>
 </form></dialog>
 
+<div class="toast" id="toast"></div>
 <nav class="tabbar" id="tabbar">
   <button data-tab="home" class="on"><i></i><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg><span>Início</span></button>
   <button data-tab="fin"><i></i><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 11c3 2 6 2 9 0s6-2 9 0"/></svg><span>Financeiro</span></button>

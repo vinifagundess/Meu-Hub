@@ -1,8 +1,9 @@
-:root{--bg:#0a0a0a;--card:#151515;--line:#2a2a2a;--text:#f4f0e6;--muted:#8d8d8d;--accent:#a78bfa;--on-accent:#12051f;--pos:#7bd88f;--neg:#ff7b72;--tab:68px;--tab-bottom:0px}
+:root{--bg:#0a0a0a;--card:#151515;--line:#2a2a2a;--text:#f4f0e6;--muted:#8d8d8d;--accent:#a78bfa;--on-accent:#12051f;--pos:#7bd88f;--neg:#ff7b72;--tab:64px}
 @media (prefers-color-scheme:light){:root{--bg:#f5f1e8;--card:#fff;--line:#ddd7c8;--text:#141414;--muted:#807a6c;--accent:#6d28d9;--on-accent:#ffffff;--pos:#1f8a3b;--neg:#c9302c}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;overflow:hidden;margin:0;background:var(--bg);color:var(--text);font:16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;overscroll-behavior:none}
-#app{position:fixed;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top,0px) + 16px) max(16px,calc((100vw - 640px)/2)) calc(var(--tab) + env(safe-area-inset-bottom,0px) + 24px)}
+html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;overscroll-behavior:none}
+body{min-height:calc(100vh + 1px)}
+#app{padding:calc(env(safe-area-inset-top,0px) + 16px) 16px calc(var(--tab) + env(safe-area-inset-bottom,0px) + 24px);max-width:640px;margin:auto}
 h1{font-size:2rem;margin:8px 0 16px;letter-spacing:-.02em}
 .view{display:none}.view.active{display:block;animation:in .28s ease}
 @keyframes in{from{opacity:0;transform:translateY(8px)}}
@@ -40,7 +41,7 @@ dialog::backdrop{background:#0009;backdrop-filter:blur(4px)}
 .wish h3{margin:0;font-size:1rem}.price{font-weight:700;font-size:1.2rem}
 .offers{margin-top:10px;border-top:1px solid var(--line);padding-top:8px;font-size:.9rem}
 .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-.tabbar{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--bg);border-top:1px solid var(--line);padding-bottom:var(--tab-bottom);height:calc(var(--tab) + var(--tab-bottom))}
+.tabbar{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--bg);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);height:calc(var(--tab) + env(safe-area-inset-bottom,0px))}
 .tabbar button{flex:1;position:relative;background:none;border:0;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font:500 .78rem -apple-system,system-ui,sans-serif;transition:color .2s}
 .tabbar svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .tabbar i{position:absolute;top:-1px;width:42px;height:3px;border-radius:2px;background:var(--accent);transform:scaleX(0);transition:transform .25s}
@@ -77,3 +78,10 @@ a{color:var(--accent)}
 .tag.on{background:color-mix(in srgb,var(--accent) 22%,var(--card));color:var(--accent)}.tag.pos{color:var(--pos)}.tag.neg{color:var(--neg)}
 .wlinks{display:flex;gap:12px;flex-wrap:wrap;font-size:.85rem}
 .tweet h3{font-weight:500;font-size:1rem;white-space:pre-wrap;overflow-wrap:anywhere}
+
+.mt{margin-top:12px}
+.seg input[value=in]:checked+span{background:var(--pos);color:#06210d}
+.seg input[value=out]:checked+span{background:var(--neg);color:#2a0705}
+.big.neg{color:var(--neg)}
+.toast{position:fixed;left:50%;bottom:calc(var(--tab) + env(safe-area-inset-bottom,0px) + 16px);transform:translate(-50%,10px);background:var(--accent);color:var(--on-accent);padding:10px 16px;border-radius:999px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:20;white-space:nowrap}
+.toast.show{opacity:1;transform:translate(-50%,0)}

@@ -5,6 +5,7 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const brl = n => Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const parseBR = s => { s = String(s ?? '').replace(/[^\d.,-]/g, ''); if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.'); const n = parseFloat(s); return isNaN(n) ? null : n; };
 const safeUrl = u => /^https?:\/\//i.test(u) ? u : '#';
 
 /* ---------- Navegação ---------- */
@@ -12,7 +13,7 @@ function go(tab) {
   $$('.view').forEach(v => v.classList.toggle('active', v.id === tab));
   $$('#tabbar button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   history.replaceState(null, '', '#' + tab);
-  $('#app').scrollTop = 0;
+  window.scrollTo(0, 0);
   if (tab === 'home') renderHome();
   if (tab === 'news') loadNews();
   if (tab === 'wish') { renderWish(); refreshStale(); }
@@ -21,27 +22,48 @@ $('#tabbar').addEventListener('click', e => { const b = e.target.closest('button
 document.addEventListener('click', e => { const c = e.target.closest('[data-go]'); if (c) go(c.dataset.go); });
 
 /* ---------- Financeiro ---------- */
-const balance = () => state.tx.reduce((s, t) => s + (t.type === 'in' ? t.amount : -t.amount), 0);
+const net = () => state.tx.reduce((s, t) => s + (t.type === 'in' ? t.amount : -t.amount), 0);
+const balance = () => state.fin.initial + net(); // saldo = saldo inicial + entradas − saídas
+const toast = m => { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2200); };
+let shown = null;
+function countTo(el, to) {
+  const from = shown ?? to, t0 = performance.now(); shown = to;
+  const step = n => { const k = Math.min(1, (n - t0) / 450); el.textContent = brl(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
 function renderFin() {
-  const sum = ty => state.tx.filter(t => t.type === ty).reduce((s, t) => s + t.amount, 0);
-  $('#f-balance').textContent = brl(balance());
+  const sum = ty => state.tx.filter(t => t.type === ty).reduce((s, t) => s + t.amount, 0), b = balance();
+  const el = $('#f-balance'); el.className = 'big' + (b < 0 ? ' neg' : ''); countTo(el, b);
+  $('#f-initial').textContent = brl(state.fin.initial);
   $('#f-in').textContent = brl(sum('in')); $('#f-out').textContent = brl(sum('out'));
   $('#tx-list').innerHTML = state.tx.length ? state.tx.map(t => `
-    <li><div>${esc(t.desc)}<small>${new Date(t.date).toLocaleDateString('pt-BR')}</small></div>
+    <li><div>${esc(t.desc)}<small>${new Date(t.date).toLocaleDateString('pt-BR')} · ${t.type === 'in' ? 'Entrada' : 'Saída'}</small></div>
     <div><b class="${t.type === 'in' ? 'pos' : 'neg'}">${t.type === 'in' ? '+' : '−'} ${brl(t.amount)}</b>
     <button data-del="${t.id}" aria-label="Excluir">×</button></div></li>`).join('')
-    : '<p class="muted">Nenhuma transação. Adicione a primeira acima.</p>';
+    : '<li class="muted">Nenhuma transação ainda.</li>';
 }
+const typeNow = () => $('#tx-form input[name=type]:checked').value;
+const syncBtn = () => { $('#tx-btn').textContent = typeNow() === 'in' ? 'Adicionar entrada' : 'Adicionar saída'; };
+$('#tx-form').addEventListener('change', syncBtn);
 $('#tx-form').addEventListener('submit', e => {
   e.preventDefault();
-  const f = new FormData(e.target);
-  state.tx.unshift({ id: uid(), type: f.get('type'), desc: f.get('desc').trim(), amount: parseFloat(f.get('amount')), date: Date.now() });
-  persist('tx'); e.target.reset(); renderFin();
+  const f = new FormData(e.target), type = f.get('type'), amount = parseBR(f.get('amount'));
+  if (!amount || amount <= 0) return toast('Digite um valor válido');
+  state.tx.unshift({ id: uid(), type, desc: f.get('desc').trim(), amount, date: Date.now() });
+  persist('tx'); e.target.reset();
+  $(`#tx-form input[value=${type}]`).checked = true; syncBtn();
+  renderFin(); toast(`${type === 'in' ? 'Entrada' : 'Saída'} de ${brl(amount)} adicionada`);
 });
 $('#tx-list').addEventListener('click', e => {
   const id = e.target.dataset.del; if (!id) return;
   state.tx = state.tx.filter(t => t.id !== id); persist('tx'); renderFin();
 });
+// "Ajustar saldo": você informa quanto tem HOJE e o app calcula o saldo inicial
+$('#f-adjust').onclick = () => {
+  const v = prompt('Qual é o seu saldo hoje? (R$)', balance().toFixed(2).replace('.', ','));
+  const n = v === null ? null : parseBR(v); if (n === null) return;
+  state.fin.initial = n - net(); persist('fin'); renderFin(); toast('Saldo ajustado');
+};
 
 /* ---------- Notas ---------- */
 let editing = null;
@@ -120,7 +142,7 @@ $('#wish-list').addEventListener('click', async e => {
   const act = e.target.dataset.act, card = e.target.closest('[data-id]'); if (!act || !card) return;
   const w = state.wish.find(x => x.id === card.dataset.id);
   if (act === 'del') state.wish = state.wish.filter(x => x !== w);
-  if (act === 'price') { const v = parseFloat((prompt('Preço (R$):') || '').replace(/\./g, '').replace(',', '.')); if (v) applyProduct(w, { price: v }); }
+  if (act === 'price') { const v = parseBR(prompt('Preço (R$):')); if (v) applyProduct(w, { price: v }); }
   if (act === 'refresh') { e.target.textContent = '…'; try { applyProduct(w, await fetchProduct(w.url)); } catch {} }
   persist('wish'); renderWish();
 });
