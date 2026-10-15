@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Meu App</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f5f1e8" media="(prefers-color-scheme: light)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Meu App">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main id="app">
+  <section class="view active" id="home">
+    <h1>Início</h1>
+    <div class="card hero" data-go="fin"><p class="muted">Saldo atual</p><p class="big" id="h-balance">R$ 0,00</p>
+      <div class="split"><span>Entradas <b class="pos" id="h-in"></b></span><span>Saídas <b class="neg" id="h-out"></b></span></div></div>
+    <div class="stats">
+      <div class="card" data-go="notes"><b id="h-n-count">0</b><p class="muted small">notas</p></div>
+      <div class="card" data-go="wish"><b id="h-w-count">0</b><p class="muted small">desejos</p></div>
+      <div class="card" data-go="wish"><b id="h-w-total">R$ 0</b><p class="muted small">na wishlist</p></div>
+    </div>
+    <h2>Anotações em destaque</h2>
+    <div class="carousel" id="h-carousel"></div><div class="dots" id="h-dots"></div>
+    <h2>Últimas movimentações</h2>
+    <ul class="list card" id="h-tx"></ul>
+    <h2>Notícia em destaque</h2>
+    <div class="card" id="h-news-card"><p id="h-news" class="clamp">Carregando…</p><p class="muted small" id="h-news-src"></p></div>
+  </section>
+
+  <section class="view" id="fin">
+    <h1>Financeiro</h1>
+    <div class="card"><p class="muted">Saldo atual</p><p class="big" id="f-balance">R$ 0,00</p>
+      <div class="split"><span>Entradas <b class="pos" id="f-in"></b></span><span>Saídas <b class="neg" id="f-out"></b></span></div></div>
+    <form id="tx-form" class="card stack">
+      <div class="seg"><label><input type="radio" name="type" value="in" checked><span>Entrada</span></label><label><input type="radio" name="type" value="out"><span>Saída</span></label></div>
+      <input name="desc" placeholder="Descrição (ex: Almoço, Uber)" required maxlength="60">
+      <input name="amount" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="Valor (R$)" required>
+      <button class="btn">Adicionar</button>
+    </form>
+    <ul class="list" id="tx-list"></ul>
+  </section>
+
+  <section class="view" id="notes">
+    <h1>Notes</h1>
+    <div class="grid" id="notes-grid"></div>
+    <button class="fab" id="note-new" aria-label="Nova nota">+</button>
+  </section>
+
+  <section class="view" id="wish">
+    <h1>Wishlist</h1>
+    <form id="wish-form" class="card stack">
+      <input name="url" type="url" inputmode="url" placeholder="Cole o link do produto" required>
+      <button class="btn">Adicionar à lista</button>
+      <p class="muted small" id="wish-status"></p>
+    </form>
+    <div id="wish-list" class="stack"></div>
+  </section>
+
+  <section class="view" id="news">
+    <h1>News</h1>
+    <div class="chips" id="chips"></div>
+    <p class="muted small" id="news-status"></p>
+    <div id="news-list" class="stack"></div>
+  </section>
+</main>
+
+<dialog id="note-dialog"><form method="dialog" class="stack" id="note-form">
+  <input name="title" placeholder="Título" maxlength="80">
+  <textarea name="body" rows="9" placeholder="Escreva sua nota…"></textarea>
+  <div class="split"><button type="button" class="btn ghost danger" id="note-del">Excluir</button><button type="button" class="btn ghost" id="note-cancel">Cancelar</button><button class="btn" value="save">Salvar</button></div>
+</form></dialog>
+
+<nav class="tabbar" id="tabbar">
+  <button data-tab="home" class="on"><i></i><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/></svg><span>Início</span></button>
+  <button data-tab="fin"><i></i><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 11c3 2 6 2 9 0s6-2 9 0"/></svg><span>Financeiro</span></button>
+  <button data-tab="notes"><i></i><svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M9 13h6M9 17h6M13 3v5h5"/></svg><span>Notes</span></button>
+  <button data-tab="wish"><i></i><svg viewBox="0 0 24 24"><path d="M12 20s-8-5-8-11a4.5 4.5 0 0 1 8-2.5A4.5 4.5 0 0 1 20 9c0 6-8 11-8 11z"/></svg><span>Wishlist</span></button>
+  <button data-tab="news"><i></i><svg viewBox="0 0 24 24"><rect x="7" y="3" width="14" height="18" rx="2"/><path d="M3 8v10a2 2 0 0 0 2 2M10 8h8M10 12h8M10 16h5"/></svg><span>News</span></button>
+</nav>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
