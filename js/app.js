@@ -12,7 +12,7 @@ function go(tab) {
   $$('.view').forEach(v => v.classList.toggle('active', v.id === tab));
   $$('#tabbar button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   history.replaceState(null, '', '#' + tab);
-  window.scrollTo(0, 0);
+  $('#app').scrollTop = 0;
   if (tab === 'home') renderHome();
   if (tab === 'news') loadNews();
 }
