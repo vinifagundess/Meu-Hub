@@ -1,14 +1,9 @@
-// ⚙️ CONFIGURAÇÕES — edite só aqui
+// ⚙️ CONFIGURAÇÕES
+// As chaves de API agora ficam NA VERCEL (Settings → Environment Variables), não no código:
+//   GNEWS_API_KEY   (opcional) notícias com foto — https://gnews.io
+//   X_BEARER_TOKEN  (opcional) posts do X — API paga do X
+//   X_ACCOUNTS      (opcional) contas do X, separadas por vírgula (padrão: g1,CNNBrasil,folha,UOLNoticias)
 export const CONFIG = {
-  // Chave gratuita em https://gnews.io (100 requisições/dia no plano free)
-  GNEWS_API_KEY: 'COLE_SUA_CHAVE_AQUI',
   NEWS_REFRESH_MS: 5 * 60 * 1000,
-
-  // Backend opcional para preço real + comparação entre lojas (ex.: Cloudflare Worker).
-  // Deve responder GET ?url=... com:
-  // { title, image, price, offers: [{ store, price, url }] }
-  PRICE_API: '',
-
-  // Extrai imagem e título de qualquer link (grátis, sem chave, com limite de uso)
-  METADATA_API: 'https://api.microlink.io/?url='
+  PRICE_REFRESH_MS: 6 * 60 * 60 * 1000
 };

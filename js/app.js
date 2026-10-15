@@ -15,6 +15,7 @@ function go(tab) {
   $('#app').scrollTop = 0;
   if (tab === 'home') renderHome();
   if (tab === 'news') loadNews();
+  if (tab === 'wish') { renderWish(); refreshStale(); }
 }
 $('#tabbar').addEventListener('click', e => { const b = e.target.closest('button'); if (b) go(b.dataset.tab); });
 document.addEventListener('click', e => { const c = e.target.closest('[data-go]'); if (c) go(c.dataset.go); });
@@ -70,89 +71,94 @@ $('#note-form').addEventListener('submit', () => {
 });
 
 /* ---------- Wishlist ---------- */
+const host = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
+const gShop = t => `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(t || '')}`;
 async function fetchProduct(url) {
-  // 1) Seu backend (preço real + lojas). 2) Fallback: metadados via Microlink.
-  if (CONFIG.PRICE_API) {
-    const r = await fetch(CONFIG.PRICE_API + (CONFIG.PRICE_API.includes('?') ? '&' : '?') + 'url=' + encodeURIComponent(url));
-    if (r.ok) return await r.json();
-  }
-  const r = await fetch(CONFIG.METADATA_API + encodeURIComponent(url));
-  const d = (await r.json()).data || {};
-  return { title: d.title, image: d.image?.url || d.logo?.url, price: d.price?.amount ?? null, offers: [] };
-}
-const searchLinks = t => { const q = encodeURIComponent(t); return [
-  ['Google Shopping', `https://www.google.com/search?tbm=shop&q=${q}`],
-  ['Buscapé', `https://www.buscape.com.br/search?q=${q}`],
-  ['Zoom', `https://www.zoom.com.br/search?q=${q}`]]; };
-function renderWish() {
-  $('#wish-list').innerHTML = state.wish.length ? state.wish.map(w => {
-    const hist = w.history || [], first = hist[0]?.price, drop = first && w.price && w.price < first;
-    return `<div class="card" data-id="${w.id}"><div class="wish">
-      ${w.image ? `<img src="${esc(w.image)}" alt="" loading="lazy">` : '<img alt="">'}
-      <div><h3>${esc(w.title || w.url)}</h3>
-      <div class="price">${w.price ? brl(w.price) : '<button class="btn ghost sm" data-act="price">Definir preço</button>'}</div>
-      ${drop ? `<small class="pos">↓ ${brl(first - w.price)} abaixo do preço inicial</small>` : ''}</div></div>
-      ${(w.offers || []).length ? `<div class="offers">${w.offers.map(o => `<div class="split"><a href="${esc(safeUrl(o.url))}" target="_blank" rel="noopener">${esc(o.store)}</a><b>${brl(o.price)}</b></div>`).join('')}</div>` : ''}
-      <div class="row"><a class="btn ghost sm" href="${esc(safeUrl(w.url))}" target="_blank" rel="noopener">Abrir</a>
-      <button class="btn ghost sm" data-act="refresh">Atualizar</button>
-      ${searchLinks(w.title || '').map(([n, u]) => `<a class="btn ghost sm" href="${u}" target="_blank" rel="noopener">${n}</a>`).join('')}
-      <button class="btn ghost sm danger" data-act="del">Remover</button></div></div>`;
-  }).join('') : '<p class="muted">Cole o link de um produto para começar.</p>';
+  const r = await fetch('/api/product?url=' + encodeURIComponent(url));
+  if (!r.ok) throw new Error('api ' + r.status);
+  return r.json();
 }
 function applyProduct(w, p) {
-  w.title = p.title || w.title; w.image = p.image || w.image; w.offers = p.offers || [];
+  w.title = p.title || w.title; w.image = p.image || w.image;
   const price = parseFloat(p.price);
   if (price && price !== w.price) { w.price = price; (w.history ||= []).push({ price, at: Date.now() }); }
+  w.checked = Date.now();
+}
+function renderWish() {
+  $('#wish-list').innerHTML = state.wish.length ? state.wish.map(w => {
+    const first = w.history?.[0]?.price, d = first && w.price ? w.price - first : 0, tr = d < 0 ? 'Baixa' : d > 0 ? 'Alta' : '';
+    return `<article class="wcard" data-id="${w.id}">
+      <div class="wimg">${w.image ? `<img src="${esc(w.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : '<span>sem foto</span>'}</div>
+      <div class="chipsrow"><span class="tag on">Acompanhando</span>${tr ? `<span class="tag ${d < 0 ? 'pos' : 'neg'}">${tr}</span>` : ''}</div>
+      <h3>${esc(w.title || host(w.url))}</h3>
+      <div class="price">${w.price ? brl(w.price) : '<button class="btn ghost sm" data-act="price">Definir preço</button>'}</div>
+      ${tr ? `<p class="muted small">Preço inicial ${brl(first)}</p>` : ''}
+      <p class="muted small">${esc(host(w.url))}</p>
+      <div class="wlinks"><a href="${gShop(w.title)}" target="_blank" rel="noopener">Comparar</a><a href="${esc(safeUrl(w.url))}" target="_blank" rel="noopener">Abrir URL</a></div>
+      <div class="row"><button class="btn ghost sm" data-act="refresh">Atualizar</button><button class="btn ghost sm danger" data-act="del">Remover</button></div></article>`;
+  }).join('') : '<p class="muted">Cole o link de um produto para começar.</p>';
+}
+let refreshing = false;
+async function refreshStale() {
+  if (refreshing) return; refreshing = true;
+  for (const w of state.wish) {
+    if (Date.now() - (w.checked || 0) < CONFIG.PRICE_REFRESH_MS) continue;
+    try { applyProduct(w, await fetchProduct(w.url)); } catch { w.checked = Date.now(); }
+    persist('wish'); renderWish();
+  }
+  refreshing = false;
 }
 $('#wish-form').addEventListener('submit', async e => {
   e.preventDefault(); const st = $('#wish-status'), url = new FormData(e.target).get('url').trim();
-  st.textContent = 'Buscando informações do produto…';
+  const btn = e.target.querySelector('button'); btn.disabled = true; st.textContent = 'Buscando foto e preço…';
   const w = { id: uid(), url, history: [] };
-  try { applyProduct(w, await fetchProduct(url)); st.textContent = w.price ? '' : 'Preço não encontrado automaticamente. Toque em "Definir preço".'; }
-  catch { st.textContent = 'Não foi possível ler o link. Item salvo sem imagem.'; }
-  state.wish.unshift(w); persist('wish'); e.target.reset(); renderWish();
+  try { applyProduct(w, await fetchProduct(url)); st.textContent = w.price ? '' : 'Preço não encontrado nesse site. Toque em "Definir preço".'; }
+  catch { st.textContent = 'Não consegui ler o link agora. Item salvo; toque em Atualizar para tentar de novo.'; }
+  state.wish.unshift(w); persist('wish'); e.target.reset(); btn.disabled = false; renderWish();
 });
 $('#wish-list').addEventListener('click', async e => {
   const act = e.target.dataset.act, card = e.target.closest('[data-id]'); if (!act || !card) return;
   const w = state.wish.find(x => x.id === card.dataset.id);
   if (act === 'del') state.wish = state.wish.filter(x => x !== w);
-  if (act === 'price') { const v = parseFloat((prompt('Preço (R$):') || '').replace(',', '.')); if (v) applyProduct(w, { price: v }); }
+  if (act === 'price') { const v = parseFloat((prompt('Preço (R$):') || '').replace(/\./g, '').replace(',', '.')); if (v) applyProduct(w, { price: v }); }
   if (act === 'refresh') { e.target.textContent = '…'; try { applyProduct(w, await fetchProduct(w.url)); } catch {} }
   persist('wish'); renderWish();
 });
 
-/* ---------- News (GNews) ---------- */
-const CATS = {
-  politica: { label: 'Política', path: 'search', q: 'política' },
-  tech: { label: 'Tecnologia', path: 'top-headlines', category: 'technology' },
-  entretenimento: { label: 'Entretenimento', path: 'search', q: 'séries OR filmes OR cinema' },
-  mundo: { label: 'Mundo', path: 'top-headlines', category: 'world' }
-};
-let cat = 'politica', lastFetch = {};
+/* ---------- News ---------- */
+const CATS = { politica: { label: 'Política' }, tech: { label: 'Tecnologia' }, entretenimento: { label: 'Entretenimento' }, mundo: { label: 'Mundo' }, x: { label: 'X' } };
+let cat = 'politica', lastFetch = {}, notices = {};
 $('#chips').innerHTML = Object.entries(CATS).map(([k, c]) => `<button data-cat="${k}" class="${k === cat ? 'on' : ''}">${c.label}</button>`).join('');
 $('#chips').addEventListener('click', e => {
   const k = e.target.dataset.cat; if (!k) return; cat = k;
   $$('#chips button').forEach(b => b.classList.toggle('on', b.dataset.cat === k)); loadNews(true);
 });
 async function fetchNews(k) {
-  if (CONFIG.GNEWS_API_KEY.startsWith('COLE')) throw new Error('Adicione sua chave em js/config.js');
-  const c = CATS[k], p = new URLSearchParams({ lang: 'pt', country: 'br', max: '15', apikey: CONFIG.GNEWS_API_KEY });
-  c.category && p.set('category', c.category); c.q && p.set('q', c.q);
-  const r = await fetch(`https://gnews.io/api/v4/${c.path}?${p}`);
-  if (!r.ok) throw new Error('Erro ' + r.status + ' na API de notícias');
-  state.news[k] = (await r.json()).articles || []; persist('news'); lastFetch[k] = Date.now();
+  const r = await fetch('/api/news?cat=' + k), d = await r.json();
+  if (!r.ok) throw new Error(d.error || 'Erro ' + r.status);
+  state.news[k] = d.articles || []; notices[k] = d.notice || ''; persist('news'); lastFetch[k] = Date.now();
 }
+const when = d => d ? new Date(d).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '';
 function renderNews() {
   const list = state.news[cat] || [];
-  $('#news-list').innerHTML = list.map(a => `<a class="article" href="${esc(safeUrl(a.url))}" target="_blank" rel="noopener">
-    ${a.image ? `<img src="${esc(a.image)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
-    <div><h3>${esc(a.title)}</h3><p class="muted small">${esc(a.source?.name)} · ${new Date(a.publishedAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</p></div></a>`).join('');
+  $('#news-list').innerHTML = list.map(a => a.tweetId
+    ? `<a class="article tweet" href="${esc(safeUrl(a.url))}" data-tweet="${esc(a.tweetId)}"><div><p class="muted small"><b>𝕏</b> ${esc(a.source?.name)} · ${when(a.publishedAt)}</p><h3>${esc(a.title)}</h3></div></a>`
+    : `<a class="article" href="${esc(safeUrl(a.url))}" target="_blank" rel="noopener">
+      ${a.image ? `<img src="${esc(a.image)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}
+      <div><h3>${esc(a.title)}</h3><p class="muted small">${esc(a.source?.name)} · ${when(a.publishedAt)}</p></div></a>`).join('');
 }
+// Tweets: tenta abrir o app do X; se não abrir, cai para o navegador
+$('#news-list').addEventListener('click', e => {
+  const t = e.target.closest('[data-tweet]'); if (!t) return;
+  e.preventDefault();
+  location.href = 'twitter://status?id=' + t.dataset.tweet;
+  setTimeout(() => { if (!document.hidden) window.open(t.href, '_blank', 'noopener'); }, 1200);
+});
 async function loadNews(force) {
   renderNews();
   if (!force && Date.now() - (lastFetch[cat] || 0) < CONFIG.NEWS_REFRESH_MS) return;
   const st = $('#news-status'); st.textContent = 'Atualizando…';
-  try { await fetchNews(cat); st.textContent = ''; renderNews(); }
+  try { await fetchNews(cat); st.textContent = notices[cat] || (state.news[cat].length ? '' : 'Nada por aqui agora.'); renderNews(); }
   catch (err) { st.textContent = err.message + (state.news[cat] ? ' (mostrando última versão salva)' : ''); }
 }
 setInterval(() => { if (!document.hidden && $('#news').classList.contains('active')) loadNews(); }, CONFIG.NEWS_REFRESH_MS);
@@ -176,7 +182,19 @@ function renderCarousel() {
     el.scrollTo({ left: i * step(), behavior: 'smooth' });
   }, 4000);
 }
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+function renderWeek() {
+  const now = new Date(), start = new Date(now); start.setDate(now.getDate() - now.getDay());
+  $('#wk-month').textContent = cap(now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
+  $('#wk-today').textContent = cap(now.toLocaleDateString('pt-BR', { weekday: 'long' })) + ', ' + now.getDate();
+  $('#wk-days').innerHTML = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((l, i) => {
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    return `<div class="wd${d.toDateString() === now.toDateString() ? ' today' : ''}"><span>${l}</span><b>${d.getDate()}</b></div>`;
+  }).join('');
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) renderWeek(); });
 async function renderHome() {
+  renderWeek();
   const sum = ty => state.tx.filter(t => t.type === ty).reduce((s, t) => s + t.amount, 0);
   $('#h-balance').textContent = brl(balance());
   $('#h-in').textContent = brl(sum('in')); $('#h-out').textContent = brl(sum('out'));
